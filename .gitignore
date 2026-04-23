@@ -1,2 +1,47 @@
-# created by virtualenv automatically
-*
+# Bytecode, интерпретатор
+__pycache__/
+*.py[cod]
+*.so
+*.pyd
+
+# Виртуальное окружение
+venv/
+env/
+ENV/
+.venv
+venv.bak/
+
+# Файлы IDE / редакторов
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Логи, базы данных, временные файлы
+*.log
+*.sqlite3
+*.db
+*.tmp
+*.temp
+
+# Файлы с секретами / конфигурация окружения
+.env
+.env.local
+.secrets
+config_local.py
+credentials.json
+*.key
+*.pem
+
+# Файлы упаковки
+*.egg-info/
+*.egg
+dist/
+build/
+MANIFEST
+
+# Файлы профилирования
+*.prof
+*.lprof
