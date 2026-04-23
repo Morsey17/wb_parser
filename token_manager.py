@@ -12,25 +12,26 @@ MAX_ATTEMPTS = 3
 # Путь к файлу со старым токеном, чтобы каждый раз не создавать новый
 TOKEN_FILENAME = "token.secret"
 
-#lock = asyncio.Lock()
+
+# lock = asyncio.Lock()
 
 
 class TokenManager:
     def __init__(self):
         self.cookie_need = COOKIE_NEED
-        self.url = URL_TO_PAGE
+        self.url = URL
         self.user_agent = HEADERS['user-agent']
         self.token = None
+        self.is_fresh = False
         self._get_token_from_file()
         if not self.token:
             self.get_fresh_token()
 
-
-    def get_fresh_token(self):
+    def _get_fresh_token(self):
         # Запускает браузер и извлекает токен x_wbaas_token.
         driver = Driver(
-            uc=True,        # Undetected Chrome - обход защиты
-            headed=False,   # Без графического интерфейса
+            uc=True,  # Undetected Chrome - обход защиты
+            headed=False,  # Без графического интерфейса
             headless=True,  # В фоновом режиме
             agent=self.user_agent,
         )
@@ -46,6 +47,8 @@ class TokenManager:
                 for cookie in cookies.get("cookies", []):
                     if cookie.get("name") == COOKIE_NEED:
                         self.token = cookie.get("value")
+                        self.is_fresh = True
+                        COOKIES[self.cookie_need] = self.token
                         logger.success(f"Токен успешно получен")
                         logger.info(f"Токен: {self.token}...")
                         self._save_token_to_file()
@@ -62,6 +65,10 @@ class TokenManager:
             driver.quit()
             logger.debug("Браузер закрыт")
 
+    async def get_token(self):
+        async with asyncio.Lock() as lock:
+            if self.is_fresh == False:
+                await asyncio.to_thread(self._get_fresh_token)
 
     def _save_token_to_file(self):
         try:
@@ -71,7 +78,6 @@ class TokenManager:
         except Exception as e:
             logger.error(f"Ошибка записи в {TOKEN_FILENAME}: {e}")
 
-
     def _get_token_from_file(self):
         if os.path.exists(TOKEN_FILENAME):
             try:
@@ -80,7 +86,6 @@ class TokenManager:
                     logger.success(f"Токен загружен из {TOKEN_FILENAME}")
             except Exception as e:
                 logger.error(f"Ошибка чтения {TOKEN_FILENAME}: {e}")
-
 
     """
     async def get_token(self):
@@ -107,7 +112,6 @@ class TokenManager:
             logger.error("Не удалось получить токен")
             raise RuntimeError("Не удалось получить токен")
     """
-
 
 
 # Для тестирования модуля напрямую
