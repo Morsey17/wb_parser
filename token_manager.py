@@ -2,7 +2,7 @@ import time
 import os
 import asyncio
 from seleniumbase import Driver
-from loguru import logger
+from custom_loger import logger
 from typing import Optional
 
 from config import *
