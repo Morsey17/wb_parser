@@ -59,7 +59,7 @@ class Parser:
                     return
 
                 if not DEBUG:
-                    self.progress_bar = trange(total, ncols=200)
+                    self.progress_bar = trange(total, ncols=100)
                 num_pages = math.ceil(total / 100)
                 tasks = [self._get_page_data(semaphore_page, semaphore_card, client, page) for page in
                          range(1, num_pages + 1)]
@@ -327,7 +327,7 @@ class Parser:
             except RequestError as e:
                 pass
 
-        logger.error(f"Артикул под номером {article_id} не обработан.")
+        #logger.error(f"Артикул под номером {article_id} не обработан.")
         return None
 
     def build_card_url(self, article_id):
@@ -337,6 +337,7 @@ class Parser:
         vol = f"vol{id_str[:add_len]}"
         part = f"part{id_str[:add_len+2]}"
         url = f"https://sip-basket-cdn-01.geobasket.ru/{vol}/{part}/{article_id}/info/ru/card.json"
+        "https://sip-basket-cdn-01.geobasket.ru/6940/694038/694038423/info/ru/card.json"
         #print(url)
         return url
 

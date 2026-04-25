@@ -30,6 +30,7 @@ venv.bak/
 .env
 .env.local
 .secrets
+*.secret
 config_local.py
 credentials.json
 *.key

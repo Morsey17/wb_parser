@@ -3,15 +3,15 @@ COOKIE_NEED = 'x_wbaas_token'
 URL = 'https://www.wildberries.ru/__internal/search/exactmatch/ru/common/v18/search'
 
 # Все товары
-OUTPUT_PRODUCTS_FILENAME = "products.xlsx"
+OUTPUT_PRODUCTS_FILENAME = "products1.xlsx"
 # Выборка по критериям
-OUTPUT_SELECTION_FILENAME = "products_selection.xlsx"
+OUTPUT_SELECTION_FILENAME = "products_selection1.xlsx"
 
 # DEBUG = False -> Отключает логирование в консоль и оставляет только прогресс бар.
-DEBUG = False
+DEBUG = True
 
 # Добавляет дополнительные колонки в итоговые таблицы для проверки
-ADD_INFO = False
+ADD_INFO = True
 
 COOKIES = {
     #'wbx-validation-key': '8fc8ab81-fb27-465b-bad6-feef3bd7c1a4',
