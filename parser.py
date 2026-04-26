@@ -3,7 +3,7 @@ from httpx import RequestError
 import asyncio
 
 import json
-from datetime import datetime
+import aiofiles
 import random
 import math
 
@@ -14,7 +14,6 @@ from custom_loger import logger
 from tqdm import tqdm, trange
 
 from config import *
-from script_test import build_card_url
 from token_manager import TokenManager
 
 # Максимальное количество запросов на страницу
@@ -31,22 +30,24 @@ DELAY_MAX = 6
 class ParserStoppedException(Exception):
     pass
 
-
 class Parser:
-    def __init__(self):
-        self.token = TokenManager()
-        if not self.token.token:
-            self.token.get_token()
+    def __init__(self, debug_console=True, save_response=True, output_path="output/"):
         # Элементы массива - спарсенные товары
+        self.debug_console = debug_console
+        self.save_response = save_response
+        self.output_path = output_path
         self.rows_data = []
-        # Элементы массива - индексы предудыщего массива, которые проходят условие и сохраняются отдельным файлом
+        # Элементы этого массива - индексы предудыщего массива, которые проходят условие и сохраняются отдельным файлом
         self.rows_index_with_condition = []
         self.stop_event = asyncio.Event()
+        self.token = None
         self.progress_bar = None
 
 
     async def run(self):
         logger.success("Парсер запущен!", True)
+        self.token = TokenManager()
+        await self.token.init()
         semaphore_page = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS_PAGE)
         semaphore_card = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS_CARD)
         async with httpx.AsyncClient(
@@ -60,7 +61,7 @@ class Parser:
                 if not total or total <= 0:
                     return
 
-                if not DEBUG:
+                if not self.debug_console:
                     self.progress_bar = trange(total, ncols=100)
                 num_pages = math.ceil(total / 100)
                 tasks = [self._get_page_data(semaphore_page, semaphore_card, client, page) for page in
@@ -73,17 +74,15 @@ class Parser:
                     self.progress_bar.close()
 
                 # Окончание работы парсера (нужно для сохранения результатов)
-                now = datetime.now()
-                timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
-                self._save_result(range(len(self.rows_data)), f"products_{timestamp}.xlsx")
-                self._save_result(self.rows_index_with_condition, f"products_selection_{timestamp}.xlsx")
+                self._save_result(range(len(self.rows_data)), f"{self.output_path}products.xlsx")
+                self._save_result(self.rows_index_with_condition, f"{self.output_path}products_selection.xlsx")
 
 
     def get_delay(self, attempt):
-        return random.uniform(DELAY_MIN, DELAY_MAX) + (attempt - 1) * 2
+        return random.uniform(DELAY_MIN, DELAY_MAX) + (attempt - 1) * 3
 
 
-    def _save_result(self, value_list, filename: str):
+    def _save_result(self, value_list, filepath: str):
 
         if not self.rows_data or not value_list:
             logger.warning("Нет данных для записи.")
@@ -119,7 +118,6 @@ class Parser:
             adjusted_width = min(max_len + 2, 50)
             ws.column_dimensions[col_letter].width = adjusted_width
 
-        filepath = f"{OUTPUT_PATH}{filename}.xlsx"
         try:
             wb.save(filepath)
             logger.success(f"Результат сохранён в файл по пути: {filepath}", True)
@@ -153,7 +151,12 @@ class Parser:
         async with semaphore_page:
             response_page = await self._fetch_page(client, page)
             if not response_page:
+                logger.warning(f"Не удалось получить страницу {page}")
                 return None
+            elif self.save_response:
+                filename = f"{self.output_path}data_page_{page}.json"
+                async with aiofiles.open(filename, "w", encoding="utf-8") as f:
+                    await f.write(json.dumps(response_page, ensure_ascii=False, indent=4))
 
             products = response_page.get("products", [])
 
@@ -269,9 +272,16 @@ class Parser:
                 PARAMS['page'] = page
                 response = await client.get(URL, params=PARAMS)
                 if response.status_code >= 200 and response.status_code < 300:
-                    logger.success(f"Страница {page} успешно получена")
-                    data = response.json()
-                    return data
+                    try:
+                        data = response.json()
+                        products = data.get("products", [])
+                        if products:
+                            logger.success(f"Страница {page} успешно получена")
+                            return data
+                        else:
+                            continue
+                    except:
+                        continue
                 elif response.status_code == 498:
                     text = response.text
                     logger.error(f"Страница {page}: Ошибка 498. Ответ: {text}")

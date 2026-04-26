@@ -19,9 +19,11 @@ class TokenManager:
         self.user_agent = HEADERS['user-agent']
         self.token = None
         self.is_fresh = False
+
+    async def init(self):
         self._get_token_from_file()
         if not self.token:
-            self.get_token()
+            await self.get_token()
 
     def _get_fresh_token(self):
         # Запускает браузер и извлекает токен x_wbaas_token.
@@ -61,9 +63,10 @@ class TokenManager:
             driver.quit()
             logger.debug("Браузер закрыт")
 
+
     async def get_token(self):
         async with asyncio.Lock() as lock:
-            if self.is_fresh == False:
+            if not self.is_fresh:
                 await asyncio.to_thread(self._get_fresh_token)
 
     def _save_token_to_file(self):
@@ -87,7 +90,7 @@ class TokenManager:
 # Для тестирования модуля напрямую
 if __name__ == "__main__":
     token = TokenManager()
-    token.get_fresh_token()
+    token.get_token()
     if token.token:
         print(f"\nТокен получен:\n{token.token}")
     else:

@@ -4,11 +4,13 @@ URL = 'https://www.wildberries.ru/__internal/search/exactmatch/ru/common/v18/sea
 
 # Файл с токеном для антибот защиты на ВБ
 TOKEN_FILENAME = "token.secret"
-# Папка с выводом результатов парсинга
-OUTPUT_PATH = "output/"
 
 # DEBUG = False -> Отключает логирование в консоль и оставляет только прогресс бар.
-DEBUG = False
+DEBUG_CONSOLE = False
+# Сохранять логи в файлы (для отладки)
+SAVE_LOGS = True
+# Сохранять ответы в файлы (для отладки)
+SAVE_RESPONSE = True
 
 # Добавляет дополнительные колонки в итоговые таблицы для проверки
 ADD_INFO = False
