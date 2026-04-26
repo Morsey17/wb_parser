@@ -1,27 +1,45 @@
-# название куки с токеном
+# Название куки с токеном для антибот защиты.
+from openpyxl.pivot.cache import Query
+
 COOKIE_NEED = 'x_wbaas_token'
-URL = 'https://www.wildberries.ru/__internal/search/exactmatch/ru/common/v18/search'
-
-# Файл с токеном для антибот защиты на ВБ
+# Файл с токеном для антибот защиты на ВБ. Создаётся автоматически, если не был найден.
 TOKEN_FILENAME = "token.secret"
+# URL-адерс, на который будут посылаться основные запросы.
+URL = 'https://www.wildberries.ru/__internal/search/exactmatch/ru/common/v18/search'
+# Собственно сам запрос
+QUERY = 'пальто из натуральной шерсти'
 
-# DEBUG = False -> Отключает логирование в консоль и оставляет только прогресс бар.
-DEBUG_CONSOLE = False
+# Максимальное количество попыток одного запроса
+MAX_ATTEMPTS = 5
+
+# Максимальное количество запросов на страницу (небольшая недоработка и лучше не трогать, всегда ставляя 1)
+MAX_CONCURRENT_REQUESTS_PAGE = 1
+# Максимальное количество запросов на карточку
+MAX_CONCURRENT_REQUESTS_CARD = 20
+
+# Включает/отключает логирование в консоль и оставляет только прогресс бар.
+DEBUG_CONSOLE = True
 # Сохранять логи в файлы (для отладки)
 SAVE_LOGS = True
-# Сохранять ответы в файлы (для отладки)
+# Сохранять ответы запросов в файлы (для отладки)
 SAVE_RESPONSE = True
 
 # Добавляет дополнительные колонки в итоговые таблицы для проверки
 ADD_INFO = False
 
+
+# Ошибка для остановки парсера при определённых условиях
+class ParserStoppedException(Exception):
+    pass
+
+
 COOKIES = {
-    #'wbx-validation-key': '8fc8ab81-fb27-465b-bad6-feef3bd7c1a4',
-    #'external-locale': 'ru',
-    #'__zzatw-wb': 'MDA0dBA=Fz2+aQ==',
-    #'_cp': '1',
-    #'_wbauid': '7408296441772550624',
-    #'cfidsw-wb': 'ZPp8S1WnfPhTUuWZyAKy3NEd8WPAZ5SdHo5HumTafABFLVmqh+LOa06d+T+9EbQ7zhN3GvInYNCjbKDIH5fRZlyinY3TBvezPp6VZmiKiuJxU3SyaMONoMjOcvClZHqsVnQIilq042NI7xrHHLZ+l2BIrnUrvZZkpRFG',
+    # 'wbx-validation-key': '8fc8ab81-fb27-465b-bad6-feef3bd7c1a4',
+    # 'external-locale': 'ru',
+    # '__zzatw-wb': 'MDA0dBA=Fz2+aQ==',
+    # '_cp': '1',
+    # '_wbauid': '7408296441772550624',
+    # 'cfidsw-wb': 'ZPp8S1WnfPhTUuWZyAKy3NEd8WPAZ5SdHo5HumTafABFLVmqh+LOa06d+T+9EbQ7zhN3GvInYNCjbKDIH5fRZlyinY3TBvezPp6VZmiKiuJxU3SyaMONoMjOcvClZHqsVnQIilq042NI7xrHHLZ+l2BIrnUrvZZkpRFG',
     'x_wbaas_token': '1.1000.173781d2a26c4ec5876da1f270c28625.MHwxODUuMTUuMzguNDF8TW96aWxsYS81LjAgKFdpbmRvd3MgTlQgMTAuMDsgV2luNjQ7IHg2NCkgQXBwbGVXZWJLaXQvNTM3LjM2IChLSFRNTCwgbGlrZSBHZWNrbykgQ2hyb21lLzE0NC4wLjAuMCBZYUJyb3dzZXIvMjYuMy4wLjAgU2FmYXJpLzUzNy4zNnwxNzc4MTU5NzMyfHJldXNhYmxlfDJ8ZXlKb1lYTm9Jam9pSW4wPXwwfDN8MTc3NzU1NDkzMnwx.MEUCIQD9o7/WbvgQOqNeItj+/Urvj+jZjwFFt/2epkE+m3C5dgIgN6I7q18DQTMVPcATGI+iNsO3GxYQppXrY/uLhvB3FDw=',
 }
 
@@ -43,7 +61,7 @@ HEADERS = {
     'x-queryid': 'qid740829644177255062420260423132110',
     'x-requested-with': 'XMLHttpRequest',
     'x-spa-version': '14.6.4',
-    #'x-userdata': 'AQMBAAIEAAMDAAozQAGENQAAAAA8AAAAAAA',
+    # 'x-userdata': 'AQMBAAIEAAMDAAozQAGENQAAAAA8AAAAAAA',
     'x-userid': '0',
 }
 
@@ -55,18 +73,18 @@ PARAMS = {
     'hide_vflags': '4294967296',
     'lang': 'ru',
     'page': '1',
-    'query': 'пальто из натуральной шерсти',
+    'query': QUERY,
     'resultset': 'catalog',
     'sort': 'popular',
     'spp': '30',
     'suppressSpellcheck': 'false',
 }
 
-
 if __name__ == "__main__":
     import requests
+
     response = requests.get(
-        'https://www.wildberries.ru/__internal/search/exactmatch/ru/common/v18/search',
+        url=URL,
         params=PARAMS,
         cookies=COOKIES,
         headers=HEADERS,

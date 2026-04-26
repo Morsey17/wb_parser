@@ -3,13 +3,8 @@ import os
 import asyncio
 from seleniumbase import Driver
 from custom_loger import logger
-from typing import Optional
 
 from config import *
-
-# Количество попыток получить токен
-MAX_ATTEMPTS = 3
-# Путь к файлу со старым токеном, чтобы каждый раз не создавать новый
 
 
 class TokenManager:
@@ -20,6 +15,7 @@ class TokenManager:
         self.token = None
         self.is_fresh = False
 
+    # Дополнительная инициализация для ассинхронной функции, которую невозможно запустить из __init__.
     async def init(self):
         self._get_token_from_file()
         if not self.token:
@@ -28,16 +24,18 @@ class TokenManager:
     def _get_fresh_token(self):
         # Запускает браузер и извлекает токен x_wbaas_token.
         driver = Driver(
-            uc=True,  # Undetected Chrome - обход защиты
-            headed=False,  # Без графического интерфейса
-            headless=True,  # В фоновом режиме
+            # Undetected Chrome - обход защиты
+            uc=True,
+            # Без графического интерфейса
+            headed=False,
+            # В фоновом режиме
+            headless=True,
             agent=self.user_agent,
         )
         try:
             logger.info(f"Открываем {self.url} с User-Agent: {self.user_agent[:50]}...")
             driver.open(self.url)
 
-            # Даем время на установку всех кук (3 попытки с интервалом 5 сек)
             for i in range(MAX_ATTEMPTS):
                 cookies = driver.execute_cdp_cmd("Network.getAllCookies", {})
                 logger.debug(f"Попытка {i + 1}")
@@ -51,11 +49,11 @@ class TokenManager:
                         logger.info(f"Токен: {self.token}...")
                         self._save_token_to_file()
 
-                # Если токен еще не появился, ждем
                 if i < MAX_ATTEMPTS - 1:
                     time.sleep(5)
 
             logger.error(f"Не удалось получить токен после всех попыток")
+            raise ParserStoppedException()
 
         except Exception as e:
             logger.error(f"Ошибка при получении токена: {e}")
@@ -87,7 +85,6 @@ class TokenManager:
                 logger.error(f"Ошибка чтения {TOKEN_FILENAME}: {e}")
 
 
-# Для тестирования модуля напрямую
 if __name__ == "__main__":
     token = TokenManager()
     token.get_token()

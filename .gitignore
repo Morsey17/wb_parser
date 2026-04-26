@@ -47,6 +47,7 @@ MANIFEST
 *.prof
 *.lprof
 
+# Мои файлы
 script_test.py
+output*/
 output/
-downloaded_files/

@@ -11,24 +11,14 @@ import openpyxl
 from openpyxl.styles import Font, Alignment
 
 from custom_loger import logger
-from tqdm import tqdm, trange
+from tqdm import trange
 
 from config import *
 from token_manager import TokenManager
 
-# Максимальное количество запросов на страницу
-MAX_CONCURRENT_REQUESTS_PAGE = 1
-# Максимальное количество запросов на карточку
-MAX_CONCURRENT_REQUESTS_CARD = 9
-MAX_ATTEMPTS = 5  # количество попыток получить один запрос
-
 DELAY_MIN = 3
 DELAY_MAX = 6
 
-
-# Исключение для остановки всех задач парсера
-class ParserStoppedException(Exception):
-    pass
 
 class Parser:
     def __init__(self, debug_console=True, save_response=True, output_path="output/"):
@@ -36,13 +26,13 @@ class Parser:
         self.debug_console = debug_console
         self.save_response = save_response
         self.output_path = output_path
+        # Строки данных всех товаров
         self.rows_data = []
         # Элементы этого массива - индексы предудыщего массива, которые проходят условие и сохраняются отдельным файлом
         self.rows_index_with_condition = []
         self.stop_event = asyncio.Event()
         self.token = None
         self.progress_bar = None
-
 
     async def run(self):
         logger.success("Парсер запущен!", True)
@@ -67,23 +57,25 @@ class Parser:
                 tasks = [self._get_page_data(semaphore_page, semaphore_card, client, page) for page in
                          range(1, num_pages + 1)]
                 await asyncio.gather(*tasks)
+            except ParserStoppedException:
+                # logger.warning("Парсер остановлен из-за невозможности выполнить запрос. Превышено число попыток.")
+                pass
+            except (KeyboardInterrupt, asyncio.CancelledError):
+                logger.warning("Получен сигнал остановки. Сохраняем результаты...")
             except Exception as e:
-                logger.error(f"Фатальная ошибка, конец...\n{e}", True)
+                logger.error(f"Фатальная ошибка: {e}", exc_info=True)
             finally:
                 if self.progress_bar:
                     self.progress_bar.close()
 
-                # Окончание работы парсера (нужно для сохранения результатов)
+                # Сохранение
                 self._save_result(range(len(self.rows_data)), f"{self.output_path}products.xlsx")
                 self._save_result(self.rows_index_with_condition, f"{self.output_path}products_selection.xlsx")
-
 
     def get_delay(self, attempt):
         return random.uniform(DELAY_MIN, DELAY_MAX) + (attempt - 1) * 3
 
-
     def _save_result(self, value_list, filepath: str):
-
         if not self.rows_data or not value_list:
             logger.warning("Нет данных для записи.")
             return
@@ -92,20 +84,18 @@ class Parser:
         ws = wb.active
         ws.title = "Товары"
 
-        # Заголовки
         headers = list(self.rows_data[0].keys())
         ws.append(headers)
-        # Стиль для заголовков
+
         for col_idx, header in enumerate(headers, start=1):
             cell = ws.cell(row=1, column=col_idx)
             cell.font = Font(bold=True)
             cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
-        # Данные
         for idx in value_list:
             ws.append([self.rows_data[idx].get(h, "") for h in headers])
 
-        # Автоподбор ширины столбцов (простой вариант)
+        # Автоподбор ширины столбцов
         for col in ws.columns:
             max_len = 0
             col_letter = col[0].column_letter
@@ -124,7 +114,6 @@ class Parser:
         except:
             logger.error(f"Не удалось сохранить файл по пути {filepath}", True)
 
-
     async def _get_total(self, client) -> int:
         for attempt in range(1, MAX_ATTEMPTS + 1):
             try:
@@ -141,10 +130,9 @@ class Parser:
                 else:
                     logger.warning(f"{response.status_code}\n{response.text}")
             except RequestError as e:
-                logger.warning(f"Ошибка при попытке получить количество всех товаров, попытка {attempt}")
-        logger.error(f"Не получилось получить количество товара, это конец...")
+                logger.warning(f"Разрыв соединения при попытке получить количество всех товаров, попытка {attempt}")
+        logger.error(f"Не удалось получить ответ от сервера.")
         raise ParserStoppedException("Парсинг остановлен")
-
 
     # Функция полностью извлекает и данные со страницы, и данные карточек по товарам на странице
     async def _get_page_data(self, semaphore_page, semaphore_card, client, page):
@@ -180,7 +168,8 @@ class Parser:
                 self.progress_bar.update(1)
 
             if not card_info:
-                logger.warning(f"Не удалось получить карточку товара на странице {page} под номером {idx}. Артикул: {article_id}")
+                logger.warning(
+                    f"Не удалось получить карточку товара на странице {page} под номером {idx}. Артикул: {article_id}")
 
             row, is_russian = self.parse_data(article_id, product, card_info, ADD_INFO, page, idx)
             self.rows_data.append(row)
@@ -188,10 +177,10 @@ class Parser:
             if row["Цена"] < 1000000 and row["Рейтинг"] >= 4.5 and is_russian:
                 self.rows_index_with_condition.append(len(self.rows_data) - 1)
 
-            logger.success(f"Товар на странице {page} под номером {idx} успешно добавлен в таблицу. Артикул: {article_id}")
+            logger.success(
+                f"Товар на странице {page} под номером {idx} успешно добавлен в таблицу. Артикул: {article_id}")
 
             return row
-
 
     def parse_data(self, article_id, product, card_info, add_info=False, page=0, idx=0) -> [dict, bool]:
         row = {
@@ -216,7 +205,6 @@ class Parser:
             row["Россия"] = "Да" if is_russian else "Нет"
         return row, is_russian
 
-
     def get_size(self, product):
         sizes_str = ""
         sizes = product.get("sizes", [])
@@ -228,19 +216,16 @@ class Parser:
                     sizes_str += ", "
         return sizes_str
 
-
     def get_country(self, options):
 
         for option in options:
             if option.get("name") == "Страна производства":
-                #logger.info(option.get("value", ""))
                 value_list = ["Россия", "РФ", "Российская Федерация"]
                 if option.get("value", "") in value_list:
                     return True
                 else:
                     return False
         return False
-
 
     def generate_image_urls(self, id, pics_count):
         urls_string = ""
@@ -249,12 +234,11 @@ class Parser:
         vol = f"vol{id_str[:add_len]}"
         part = f"part{id_str[:add_len + 2]}"
         for pic in range(1, pics_count + 1):
+            urls_string += f"https://sip-basket-cdn-01.geobasket.ru/{vol}/{part}/{id}/images/c246x328/{pic}.webp, "
             urls_string += f"https://sip-basket-cdn-01.geobasket.ru/{vol}/{part}/{id}/images/big/{pic}.webp"
             if pic <= pics_count:
                 urls_string += ", "
         return urls_string
-        #return f"https://basket-12.wbbasket.ru/vol1743/part174345/174345729/images/big/20.webp"
-
 
     def get_price(self, product: dict) -> int:
         for size in product.get("sizes", []):
@@ -262,7 +246,6 @@ class Parser:
             if price.get("product"):
                 return price["product"]
         return 0
-
 
     async def _fetch_page(self, client, page):
         for attempt in range(1, MAX_ATTEMPTS + 1):
@@ -274,10 +257,13 @@ class Parser:
                 if response.status_code >= 200 and response.status_code < 300:
                     try:
                         data = response.json()
-                        products = data.get("products", [])
+                        products = data.get("products")
                         if products:
                             logger.success(f"Страница {page} успешно получена")
                             return data
+                        elif len(products) == 0:
+                            logger.warning("Полученная страница пустая. Конец работы.")
+                            raise ParserStoppedException()
                         else:
                             continue
                     except:
@@ -291,8 +277,8 @@ class Parser:
                     logger.warning(response.text)
             except RequestError as e:
                 pass
-                #logger.warning(f"Ошибка при попытке получить страницу {page}, попытка {attempt}")
-        raise ParserStoppedException("Парсинг остановлен")
+        logger.error(f"Не удалось получить страницу данных за {MAX_ATTEMPTS} попыток. Парсинг остановлен")
+        raise ParserStoppedException("")
 
     async def _fetch_card(self, client, article_id):
         for attempt in range(1, MAX_ATTEMPTS + 1):
@@ -306,8 +292,6 @@ class Parser:
                     return data
             except RequestError as e:
                 pass
-
-        #logger.error(f"Не удалось получить карту с артикулом {article_id}.")
         return {}
 
     def build_card_url(self, article_id):
@@ -315,8 +299,6 @@ class Parser:
         # Вспомогительная переменная. Значения vol и part зависят от длины артикула
         add_len = len(id_str) - 5
         vol = f"vol{id_str[:add_len]}"
-        part = f"part{id_str[:add_len+2]}"
+        part = f"part{id_str[:add_len + 2]}"
         url = f"https://sip-basket-cdn-01.geobasket.ru/{vol}/{part}/{article_id}/info/ru/card.json"
-        "https://sip-basket-cdn-01.geobasket.ru/6940/694038/694038423/info/ru/card.json"
         return url
-
