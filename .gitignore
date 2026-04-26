@@ -48,6 +48,7 @@ MANIFEST
 *.lprof
 
 # Мои файлы
+debug_folder/
 script_test.py
 output*/
 output/

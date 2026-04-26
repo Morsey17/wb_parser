@@ -16,9 +16,6 @@ from tqdm import trange
 from config import *
 from token_manager import TokenManager
 
-DELAY_MIN = 3
-DELAY_MAX = 6
-
 
 class Parser:
     def __init__(self, debug_console=True, save_response=True, output_path="output/"):
@@ -125,7 +122,6 @@ class Parser:
                     logger.success(f"Всего количество товароа: {total}")
                     return total
                 elif response.status_code == 498:
-                    logger.warning(f"{response.status_code}\n{response.text}")
                     await self.token.get_token()
                 else:
                     logger.warning(f"{response.status_code}\n{response.text}")
