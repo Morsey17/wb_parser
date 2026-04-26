@@ -1,44 +1,54 @@
 import sys
 from loguru import logger as logger_
-from config import DEBUG
+from datetime import datetime
 
-# 1. Удаляем стандартный вывод в консоль, который loguru добавляет по умолчанию
 logger_.remove()
 
-# 2. Добавляем запись в файл (всегда, независимо от DEBUG)
+now = datetime.now()
+timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
+
 logger_.add(
-    "logs.log",               # имя файла
-    rotation="10 MB",         # опционально: ротация при достижении 10 МБ
-    retention="7 days",       # опционально: хранить логи 7 дней
-    level="DEBUG",            # пишем всё от DEBUG и выше
-    encoding="utf-8"
+    f"logs_{timestamp}.log",
+    rotation="10 MB",
+    retention="7 days",
+    level="DEBUG",
+    encoding="utf-8",
+    filter=lambda record: True  # все записи идут в файл
 )
 
-# 3. Добавляем вывод в консоль только если DEBUG = True
-if DEBUG:
-    logger_.add(
-        sys.stdout,
-        level="DEBUG",
-        format="{time} | {level} | {message}",  # кастомный формат, можно любой
-        colorize=True          # цветной вывод в консоль
-    )
+logger_.add(
+    sys.stdout,
+    format="<level>{time:HH:mm:ss} | {level: <8} | {message}</level>",
+    colorize=True,
+    level="DEBUG",
+    filter=lambda record: record["extra"].get("to_console", False)
+)
 
-# 4. Твой класс-обёртка теперь просто передаёт вызовы в loguru без проверки DEBUG
 class CustomLogger:
-    @staticmethod
-    def success(value, debug=False):
-        logger_.opt(depth=1).success(value)
+    def __init__(self, debug=True):
+        self.debug = debug
 
-    @staticmethod
-    def info(value, debug=False):
-        logger_.opt(depth=1).info(value)
+    def success(self,value, to_console=None):
+        to_console = to_console or self.debug
+        logger_.opt(depth=1).bind(to_console=to_console).success(value)
 
-    @staticmethod
-    def warning(value, debug=False):
-        logger_.opt(depth=1).warning(value)
+    def info(self,value, to_console=None):
+        to_console = to_console or self.debug
+        logger_.opt(depth=1).bind(to_console=to_console).info(value)
 
-    @staticmethod
-    def error(value, debug=False):
-        logger_.opt(depth=1).error(value)
+    def warning(self,value, to_console=None):
+        to_console = to_console or self.debug
+        logger_.opt(depth=1).bind(to_console=to_console).warning(value)
+
+    def error(self,value, to_console=None):
+        to_console = to_console or self.debug
+        logger_.opt(depth=1).bind(to_console=to_console).error(value)
 
 logger = CustomLogger()
+
+if __name__ == "__main__":
+    logger.debug = True
+    logger.info("АЛЁ")
+    logger.error("Как дела?")
+    logger.debug = False
+    logger.success("Wtf bro?")
