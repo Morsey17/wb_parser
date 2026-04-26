@@ -3,7 +3,7 @@ from httpx import RequestError
 import asyncio
 
 import json
-import time
+from datetime import datetime
 import random
 import math
 
@@ -35,6 +35,8 @@ class ParserStoppedException(Exception):
 class Parser:
     def __init__(self):
         self.token = TokenManager()
+        if not self.token.token:
+            self.token.get_token()
         # Элементы массива - спарсенные товары
         self.rows_data = []
         # Элементы массива - индексы предудыщего массива, которые проходят условие и сохраняются отдельным файлом
@@ -44,7 +46,7 @@ class Parser:
 
 
     async def run(self):
-        logger.success("Парсер запущен!", debug=True)
+        logger.success("Парсер запущен!", True)
         semaphore_page = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS_PAGE)
         semaphore_card = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS_CARD)
         async with httpx.AsyncClient(
@@ -65,22 +67,26 @@ class Parser:
                          range(1, num_pages + 1)]
                 await asyncio.gather(*tasks)
             except Exception as e:
-                logger.error(f"Фатальная ошибка, конец...\n{e}", debug=True)
+                logger.error(f"Фатальная ошибка, конец...\n{e}", True)
             finally:
                 if self.progress_bar:
                     self.progress_bar.close()
-                self._save_result()
-                self._save_result_selection()
+
+                # Окончание работы парсера (нужно для сохранения результатов)
+                now = datetime.now()
+                timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
+                self._save_result(range(len(self.rows_data)), f"products_{timestamp}.xlsx")
+                self._save_result(self.rows_index_with_condition, f"products_selection_{timestamp}.xlsx")
 
 
     def get_delay(self, attempt):
         return random.uniform(DELAY_MIN, DELAY_MAX) + (attempt - 1) * 2
 
 
-    def _save_result(self):
+    def _save_result(self, value_list, filename: str):
 
-        if len(self.rows_data) == 0:
-            print("Нет данных для записи.")
+        if not self.rows_data or not value_list:
+            logger.warning("Нет данных для записи.")
             return
 
         wb = openpyxl.Workbook()
@@ -97,47 +103,7 @@ class Parser:
             cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
         # Данные
-        for row_data in self.rows_data:
-            ws.append([row_data.get(h, "") for h in headers])
-
-        # Автоподбор ширины столбцов (простой вариант)
-        for col in ws.columns:
-            max_len = 0
-            col_letter = col[0].column_letter
-            for cell in col:
-                try:
-                    if cell.value:
-                        max_len = max(max_len, len(str(cell.value)))
-                except:
-                    pass
-            adjusted_width = min(max_len + 2, 50)
-            ws.column_dimensions[col_letter].width = adjusted_width
-
-        wb.save(OUTPUT_PRODUCTS_FILENAME)
-        logger.success(f"Готово! Файл сохранён: {OUTPUT_PRODUCTS_FILENAME}", debug=True)
-
-
-    def _save_result_selection(self):
-
-        if len(self.rows_index_with_condition) == 0:
-            print("Нет данных для записи.")
-            return
-
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = "Выборка товаров"
-
-        # Заголовки
-        headers = list(self.rows_data[0].keys())
-        ws.append(headers)
-        # Стиль для заголовков
-        for col_idx, header in enumerate(headers, start=1):
-            cell = ws.cell(row=1, column=col_idx)
-            cell.font = Font(bold=True)
-            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-
-        # Данные
-        for idx in self.rows_index_with_condition:
+        for idx in value_list:
             ws.append([self.rows_data[idx].get(h, "") for h in headers])
 
         # Автоподбор ширины столбцов (простой вариант)
@@ -153,8 +119,12 @@ class Parser:
             adjusted_width = min(max_len + 2, 50)
             ws.column_dimensions[col_letter].width = adjusted_width
 
-        wb.save(OUTPUT_SELECTION_FILENAME)
-        logger.success(f"Готово! Файл сохранён: {OUTPUT_SELECTION_FILENAME}", debug=True)
+        filepath = f"{OUTPUT_PATH}{filename}.xlsx"
+        try:
+            wb.save(filepath)
+            logger.success(f"Результат сохранён в файл по пути: {filepath}", True)
+        except:
+            logger.error(f"Не удалось сохранить файл по пути {filepath}", True)
 
 
     async def _get_total(self, client) -> int:
@@ -165,7 +135,7 @@ class Parser:
                 if response.status_code >= 200 and response.status_code < 300:
                     data = response.json()
                     total = int(data.get("total", 0))
-                    logger.success(f"Количество товара всего: {total}")
+                    logger.success(f"Всего количество товароа: {total}")
                     return total
                 elif response.status_code == 498:
                     logger.warning(f"{response.status_code}\n{response.text}")
@@ -202,12 +172,12 @@ class Parser:
 
             # Запрос к card.json
             card_info = await self._fetch_card(client, article_id)
+
             if self.progress_bar:
                 self.progress_bar.update(1)
 
             if not card_info:
-                logger.warning(f"Товар на странице {page} под номером {idx} не удалось добавить в таблицу. Артикул: {article_id}")
-                return None
+                logger.warning(f"Не удалось получить карточку товара на странице {page} под номером {idx}. Артикул: {article_id}")
 
             row, is_russian = self.parse_data(article_id, product, card_info, ADD_INFO, page, idx)
             self.rows_data.append(row)
@@ -327,8 +297,8 @@ class Parser:
             except RequestError as e:
                 pass
 
-        #logger.error(f"Артикул под номером {article_id} не обработан.")
-        return None
+        #logger.error(f"Не удалось получить карту с артикулом {article_id}.")
+        return {}
 
     def build_card_url(self, article_id):
         id_str = str(article_id)
@@ -338,6 +308,5 @@ class Parser:
         part = f"part{id_str[:add_len+2]}"
         url = f"https://sip-basket-cdn-01.geobasket.ru/{vol}/{part}/{article_id}/info/ru/card.json"
         "https://sip-basket-cdn-01.geobasket.ru/6940/694038/694038423/info/ru/card.json"
-        #print(url)
         return url
 

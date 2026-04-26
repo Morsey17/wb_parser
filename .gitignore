@@ -46,3 +46,7 @@ MANIFEST
 # Файлы профилирования
 *.prof
 *.lprof
+
+script_test.py
+output/
+downloaded_files/

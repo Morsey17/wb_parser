@@ -10,10 +10,6 @@ from config import *
 # Количество попыток получить токен
 MAX_ATTEMPTS = 3
 # Путь к файлу со старым токеном, чтобы каждый раз не создавать новый
-TOKEN_FILENAME = "token.secret"
-
-
-# lock = asyncio.Lock()
 
 
 class TokenManager:
@@ -25,7 +21,7 @@ class TokenManager:
         self.is_fresh = False
         self._get_token_from_file()
         if not self.token:
-            self.get_fresh_token()
+            self.get_token()
 
     def _get_fresh_token(self):
         # Запускает браузер и извлекает токен x_wbaas_token.
@@ -86,32 +82,6 @@ class TokenManager:
                     logger.success(f"Токен загружен из {TOKEN_FILENAME}")
             except Exception as e:
                 logger.error(f"Ошибка чтения {TOKEN_FILENAME}: {e}")
-
-    """
-    async def get_token(self):
-        async with asyncio.Lock() as lock:
-            if self.token == False:
-                token = await asyncio.to_thread(self._get_token_from_file)
-                if token:
-                    COOKIES[self.cookie_need] = token
-                    return token, False
-                else:
-                    # Если не получилось взять токен из файла, создаём новый
-                    fresh_token = True
-
-            if fresh_token:
-                # try:
-                # Запускаем синхронную функцию обновления в отдельном потоке
-                # new_token = await asyncio.to_thread(self._sync_refresh_token)
-                # self._token = new_token
-                token = await asyncio.to_thread(get_fresh_token)
-                if token:
-                    config.COOKIES[COOKIE_NEED] = token
-                    return token, True
-
-            logger.error("Не удалось получить токен")
-            raise RuntimeError("Не удалось получить токен")
-    """
 
 
 # Для тестирования модуля напрямую
